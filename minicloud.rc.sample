@@ -1,0 +1,4 @@
+export MINICLOUD_DB_HOST="localhost"
+export MINICLOUD_DB_USERNAME="minicloud"
+export MINICLOUD_DB_PASSWORD="password"
+export MINICLOUD_DB_NAME="minicloud"
