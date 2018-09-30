@@ -350,7 +350,9 @@ class Neutron(object):
                 if (not port['device_owner'] or
                         # i think below criterium are lost ports whose vm was
                         # destroyed
-                        port['device_owner'] == 'compute:nova' and
+                        # ------------------- cover compute:nova and :ironic
+                        (port['device_owner'].startswith('compute') or
+                         port['device_owner'] == 'nuage:vip') and
                         not port['binding:profile'] or
                         # TODO(Kris) i have no clue what this ...
                         port['device_owner'] == 'compute:None'):
@@ -412,6 +414,9 @@ class Neutron(object):
         except NetworkInUseClient as e:
             exc_error('[{}] Network is in use: {}', self, e)
             raise InUseException
+        except NotFound:
+            print('delete_network: NOT FOUND!')
+	    pass
 
     def create_subnet(self, net_id, cidr):
         subnet = {'name': cidr, 'network_id': net_id, 'cidr': cidr,
@@ -462,7 +467,16 @@ class Neutron(object):
             {'security_group': sg})['security_group']
 
     def delete_sg(self, sg_id):
-        self.client.delete_security_group(sg_id)
+        try:
+            self.client.delete_security_group(sg_id)
+        except Conflict as e:
+            error_n('[{}] Conflicting sg request: {}',
+                    self, e)
+            raise IntegrityException
+        except NotFound as e:
+            error_n('[{}] Security group not found: {}',
+                    self, e)
+            raise IntegrityException
 
     def create_sg_rule(self, sg_id, protocol,
                        port_min, port_max, direction, cidr):

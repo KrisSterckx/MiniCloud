@@ -86,7 +86,7 @@ By default, MiniCloud runs interactively.
         parser = argparse.ArgumentParser(prog=self.program,
                                          usage=self.cmd_usage)
         parser.add_argument("-i", "--interactive",
-                            help="(flag) run in interactive mode where it can",
+                            help="run in interactive mode",
                             action="store_true")
         parser.add_argument('command', help="command to execute")
         #                    no store_true here !
