@@ -133,7 +133,8 @@ class CloudResourceManager(CachedEntityManager):
         except MiniCloudException as e:
             error('[{}] Failed to delete {} \'{}\'.',
                   self, self.entity_name(), entity.name)
-            raise e
+            error('TEMPORARILY IGNORING !!!')
+	    # raise e
 
     # START TO OVERRULE
 

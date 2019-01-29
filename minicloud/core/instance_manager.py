@@ -46,8 +46,8 @@ class InstanceManager(CloudResourceManager):
 
     def clear(self, cleanup=True):
         if super(InstanceManager, self).clear(cleanup=cleanup) and cleanup:
-            warn('[{}] SLEEPING so servers will be fully destroyed...',
-                 self)
+            warn('[{}] Gone SLEEPING for 10 secs now, such that servers will '
+                 'be fully destroyed...', self)
             time.sleep(10)
 
     # new public functions

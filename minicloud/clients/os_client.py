@@ -2,7 +2,7 @@ import time
 
 from minicloud.core.core_in import boolean_error, shell_variable
 from minicloud.core.core_out import end, error, error_n, \
-    exc_error, output, trace, warn
+    exc_error, output, trace, warn, warn_n
 from minicloud.core.core_types import AuthorizationException, \
     HttpAccessException, InUseException, IntegrityException, \
     MiniCloudException
@@ -39,7 +39,7 @@ try:
     from neutronclient.v2_0 import client as neutron_client_v2
     from neutronclient.neutron import client as neutron_client
     from neutronclient.common.exceptions import NetworkInUseClient, \
-        BadRequest, NotFound, \
+        BadRequest, NotFound, InternalServerError, \
         IpAddressGenerationFailureClient, \
         Conflict, OverQuotaClient
     from neutronclient.common.exceptions import Forbidden as NeutronForbidden
@@ -286,6 +286,20 @@ class Neutron(object):
         return 'OS Client'
 
     @staticmethod
+    def delete_resource(f, *args):
+        try:
+            f(*args)
+        except Conflict as e:
+            error_n('Conflicting request: {}', e)
+            raise IntegrityException
+        except NotFound as e:
+            warn_n('Resource not found when deleting it: {}', e)
+            # but, silently pass for now...
+        except InternalServerError as e:
+            warn_n('InternalServerError when deleting resource: {}', e)
+            # but, silently pass for now...
+
+    @staticmethod
     def router_names(routers):
         router_names = list()
         for router in routers:
@@ -392,11 +406,7 @@ class Neutron(object):
             raise IntegrityException
 
     def delete_router(self, router_id):
-        try:
-            self.client.delete_router(router_id)
-        except Conflict as c:
-            error_n('[{}] Delete router conflict: {}', self, c)
-            raise IntegrityException
+        self.delete_resource(self.client.delete_router, router_id)
 
     def create_network(self, name, external=False):
         network = {'name': name, 'admin_state_up': True,
@@ -408,15 +418,11 @@ class Neutron(object):
             raise IntegrityException
 
     def delete_network(self, net_id):
-        trace('[{}] delete_network [{}]', self, net_id)
         try:
-            self.client.delete_network(net_id)
+            self.delete_resource(self.client.delete_network, net_id)
         except NetworkInUseClient as e:
             exc_error('[{}] Network is in use: {}', self, e)
             raise InUseException
-        except NotFound:
-            print('delete_network: NOT FOUND!')
-	    pass
 
     def create_subnet(self, net_id, cidr):
         subnet = {'name': cidr, 'network_id': net_id, 'cidr': cidr,
@@ -428,10 +434,10 @@ class Neutron(object):
             raise IntegrityException
 
     def delete_subnet(self, subnet_id):
-        self.client.delete_subnet(subnet_id)
+        self.delete_resource(self.client.delete_subnet, subnet_id)
 
     def delete_port(self, port_id):
-        self.client.delete_port(port_id)
+        self.delete_resource(self.client.delete_port, port_id)
 
     def add_router_interface(self, router_id, subnet_id):
         add_itf = {'subnet_id': subnet_id}
@@ -443,16 +449,8 @@ class Neutron(object):
 
     def remove_router_interface(self, router_id, subnet_id):
         add_itf = {'subnet_id': subnet_id}
-        try:
-            self.client.remove_interface_router(router_id, add_itf)
-        except Conflict as e:
-            error_n('[{}] Conflicting router interface request: {}',
-                    self, e)
-            raise IntegrityException
-        except NotFound as e:
-            error_n('[{}] Router interface not found: {}',
-                    self, e)
-            raise IntegrityException
+        self.delete_resource(self.client.remove_interface_router,
+            router_id, add_itf)
 
     def security_groups(self, name=None):
         if name:
@@ -467,16 +465,7 @@ class Neutron(object):
             {'security_group': sg})['security_group']
 
     def delete_sg(self, sg_id):
-        try:
-            self.client.delete_security_group(sg_id)
-        except Conflict as e:
-            error_n('[{}] Conflicting sg request: {}',
-                    self, e)
-            raise IntegrityException
-        except NotFound as e:
-            error_n('[{}] Security group not found: {}',
-                    self, e)
-            raise IntegrityException
+        self.delete_resource(self.client.delete_security_group, sg_id)
 
     def create_sg_rule(self, sg_id, protocol,
                        port_min, port_max, direction, cidr):
@@ -526,7 +515,7 @@ class Neutron(object):
             raise IntegrityException
 
     def deallocate_floating_ip(self, fip):
-        self.client.delete_floatingip(fip['id'])
+        self.delete_resource(self.client.delete_floatingip, fip['id'])
 
 
 class Nova(object):
